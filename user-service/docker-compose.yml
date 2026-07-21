@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # Container 1: The Database
+  user-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: olp_user_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+
+  # Container 2: Your Spring Boot Application
+  user-service:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_URL=jdbc:postgresql://user-db:5432/olp_user_db
+      - DB_USERNAME= ${DB_USERNAME}
+      - DB_PASSWORD= ${DB_PASSWORD}
+    depends_on:
+      - user-db # Wait for the database container to start before starting the app
