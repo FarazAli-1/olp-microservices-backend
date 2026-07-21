@@ -20,6 +20,7 @@
     <modules>
         <module>common-lib</module>
         <module>user-service</module>
+        <module>security-lib</module>
         <module>service-discovery</module>
         <module>api-gateway</module>
         <module>config-server</module>

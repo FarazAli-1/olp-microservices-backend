@@ -1,0 +1,3 @@
+com\centegy\common\dto\PageResponse.class
+com\centegy\common\dto\ApiResponse.class
+com\centegy\common\entity\BaseEntity.class
