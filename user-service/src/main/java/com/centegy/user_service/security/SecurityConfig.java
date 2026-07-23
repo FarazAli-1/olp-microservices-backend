@@ -2,6 +2,7 @@ package com.centegy.user_service.security;
 
 import com.centegy.security.JwtAuthFilter;
 import com.centegy.security.JwtService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -22,19 +23,21 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
     @Bean
-    public JwtService  jwtService() {
-        return new JwtService("73462bf9f2dnhgaogd79y1340194bjqwnr12uisdf8340813741513sndan889");
+    public JwtService jwtService() {
+        return new JwtService(jwtSecret);
     }
 
     @Bean
-    public JwtAuthFilter  jwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter jwtAuthFilter(JwtService jwtService) {
         return new JwtAuthFilter(jwtService);
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity, JwtAuthFilter jwtAuthFilter) {
-
 
         httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
