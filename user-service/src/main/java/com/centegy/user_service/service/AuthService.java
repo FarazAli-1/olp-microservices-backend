@@ -36,7 +36,7 @@ public class AuthService {
 
         User user = new User();
         Role role = roleRepository.findById(signUpRequestDto.getRoleId())
-                        .orElseThrow(() -> new RuntimeException("Not Found"));
+                        .orElseThrow(() -> new RuntimeException("User not Found"));
 
         user.setUsername(signUpRequestDto.getUsername());
         user.setPassword(passwordEncoder.encode(signUpRequestDto.getPassword()));
@@ -56,8 +56,6 @@ public class AuthService {
         refreshTokenObject.setExpiryDate(Instant.now().plus(1, ChronoUnit.HOURS));
         refreshTokenObject.setRevoked(false);
 
-        refreshTokenRepository.save(refreshTokenObject);
-
         return new AuthResponse(accessToken,refreshToken,savedUser.getUsername());
     }
 
@@ -66,14 +64,16 @@ public class AuthService {
 
 
         User user = userRepository.findByUsername(loginRequestDto.getUsername())
-                .orElseThrow(() -> new RuntimeException("Not Found"));
+                .orElseThrow(() -> new RuntimeException("User not Found"));
 
         if (!passwordEncoder.matches(loginRequestDto.getPassword(), user.getPassword())) {
             throw new RuntimeException("Wrong password");
         }
 
+        refreshTokenRepository.deleteByUser(user);
+
         List<String> roles = List.of(user.getRole().getLevel().name());
-        String  refreshToken = jwtService.generateRefreshToken(user.getUsername());
+        String refreshToken = jwtService.generateRefreshToken(user.getUsername());
         String accessToken = jwtService.generateAccessToken(user.getUsername(), user.getId(), roles);
 
         RefreshToken refreshTokenObject = new RefreshToken();
@@ -84,12 +84,12 @@ public class AuthService {
 
         refreshTokenRepository.save(refreshTokenObject);
 
-        return new AuthResponse(accessToken,refreshToken,user.getUsername());
+        return new AuthResponse(accessToken, refreshToken, user.getUsername());
     }
 
 
+    @Transactional
     public AuthResponse refreshToken(String refreshToken) {
-
         RefreshToken refreshToken1 = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RuntimeException("Not Found"));
 
@@ -97,9 +97,11 @@ public class AuthService {
             throw new RuntimeException("Token is expired");
         }
 
+        refreshToken1.setExpiryDate(Instant.now().plus(1, ChronoUnit.HOURS));
+        refreshTokenRepository.save(refreshToken1);
+
         User user = refreshToken1.getUser();
         List<String> roles = List.of(user.getRole().getLevel().name());
-
         String accessToken = jwtService.generateAccessToken(user.getUsername(), user.getId(), roles );
 
         return new AuthResponse(accessToken,refreshToken,user.getUsername());

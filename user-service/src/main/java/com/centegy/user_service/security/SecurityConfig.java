@@ -23,7 +23,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Value("${jwt.secret}")
+    @Value("${JWT_SECRET}")
     private String jwtSecret;
 
     @Bean

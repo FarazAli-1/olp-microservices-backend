@@ -97,9 +97,8 @@ public class EnrollmentController {
         return ResponseEntity.ok(new ApiResponse<>(true, "All enrollments retrieved", response));
     }
 
-    @GetMapping("/student/{username}")
-    public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponseDto>>> getEnrollmentByStudentUsername(
-            @PathVariable String username,
+    @GetMapping("/my-enrollments")
+    public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponseDto>>> getMyEnrollments(
             @PageableDefault(
                     page = 0,
                     size = 10,
@@ -108,13 +107,13 @@ public class EnrollmentController {
             )
             Pageable pageable
     ){
-        log.info("Attempting to get enrollment by username: {}", username);
-        PageResponse<EnrollmentResponseDto> response = enrollmentService.getStudentEnrollments(username, pageable);
-        log.info("Successfully retrieved enrollment by username: {}", username);
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        PageResponse<EnrollmentResponseDto> response = enrollmentService.getStudentEnrollments(currentUsername, pageable);
+        log.info("Successfully fetched enrollments");
         return ResponseEntity.ok(
                 new ApiResponse<>(
                         true,
-                        "Successfully retrieved enrollment by username",
+                        "Successfully retrieved enrollment",
                         response
                 )
         );

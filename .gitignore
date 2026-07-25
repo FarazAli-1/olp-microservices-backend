@@ -1,1 +1,14 @@
+# IntelliJ
 .idea/
+
+# Environment variables
+.env
+
+# Maven build files
+**/target/
+
+# Compiled Java files
+**/*.class
+
+# Maven generated files
+**/*.jar
