@@ -21,8 +21,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build Common Library
-        run: mvn clean install -pl common-lib -am -Dmaven.test.skip=true
+      - name: Build Common and Security Libraries
+        run: mvn clean install -pl common-lib,security-lib -am -Dmaven.test.skip=true
 
       - name: Build Microservices (Continuous Integration)
         run: mvn clean package -Dmaven.test.skip=true
