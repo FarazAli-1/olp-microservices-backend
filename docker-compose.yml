@@ -12,6 +12,49 @@ services:
       - "8761:8761"
     networks:
       - olp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8761/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # -------------------------
+  # CONFIG SERVER
+  # -------------------------
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    depends_on:
+      service-discovery:
+        condition: service_healthy
+    networks:
+      - olp-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8888/actuator/health" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -------------------------
+  # REDIS MESSAGE BROKER / CACHE
+  # -------------------------
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis-broker
+    ports:
+      - "6379:6379"
+    networks:
+      - olp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # -------------------------
   # USER SERVICE & DATABASE
@@ -29,6 +72,11 @@ services:
     networks:
       - olp-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d olp_user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   user-service:
     build:
@@ -43,8 +91,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-defaultSecretKeyThatIsAtLeast32CharactersLongForHS256}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-discovery:8761/eureka
     depends_on:
-      - user-db
-      - service-discovery
+      user-db:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - olp-network
     restart: unless-stopped
@@ -65,6 +119,11 @@ services:
     networks:
       - olp-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d olp_course_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   course-service:
     build:
@@ -79,8 +138,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-defaultSecretKeyThatIsAtLeast32CharactersLongForHS256}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-discovery:8761/eureka
     depends_on:
-      - course-db
-      - service-discovery
+      course-db:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - olp-network
     restart: unless-stopped
@@ -101,6 +166,11 @@ services:
     networks:
       - olp-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d olp_enrollment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   enrollment-service:
     build:
@@ -115,14 +185,20 @@ services:
       - JWT_SECRET=${JWT_SECRET:-defaultSecretKeyThatIsAtLeast32CharactersLongForHS256}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-discovery:8761/eureka
     depends_on:
-      - enrollment-db
-      - service-discovery
+      enrollment-db:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - olp-network
     restart: unless-stopped
 
   # -----------------------------------------------
-  # Notification Service
+  # NOTIFICATION SERVICE
   # -----------------------------------------------
   notification-service:
     build:
@@ -132,24 +208,16 @@ services:
     ports:
       - "8084:8084"
     depends_on:
-      - service-discovery
-      - redis
+      service-discovery:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-discovery:8761/eureka
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
-    networks:
-      - olp-network
-    restart: unless-stopped
-
-  # -----------------------------------------------
-  # Redis Message Broker
-  # -----------------------------------------------
-  redis:
-    image: redis:7.0-alpine
-    container_name: redis-broker
-    ports:
-      - "6379:6379"
     networks:
       - olp-network
     restart: unless-stopped
@@ -166,7 +234,10 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-discovery:8761/eureka
     depends_on:
-      - service-discovery
+      config-server:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
     networks:
       - olp-network
 

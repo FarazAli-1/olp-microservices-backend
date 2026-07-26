@@ -1,43 +1,5 @@
-server:
-  port: 8080
 spring:
   application:
     name: api-gateway
-  cloud:
-    gateway:
-      server:
-        webmvc:
-          routes:
-            - id: user-service
-              uri: lb://user-service
-              predicates:
-                - Path=/api/auth/**
-            - id: user-service-users
-              uri: lb://user-service
-              predicates:
-                - Path=/api/users/**
-            - id: course-service
-              uri: lb://course-service
-              predicates:
-                - Path=/api/courses/**
-            - id: enrollment-service
-              uri: lb://enrollment-service
-              predicates:
-                - Path=/api/enrollments/**
-eureka:
-  client:
-    service-url:
-      defaultZone: http://service-discovery:8761/eureka
-    fetch-registry: true
-    register-with-eureka: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: gateway
-
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web: DEBUG
+  config:
+    import: optional:configserver:http://config-server:8888

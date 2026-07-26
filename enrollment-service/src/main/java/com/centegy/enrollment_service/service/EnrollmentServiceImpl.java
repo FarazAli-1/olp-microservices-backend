@@ -13,17 +13,18 @@ import com.centegy.enrollment_service.repository.EnrollmentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
-
 
 @Service
 @RequiredArgsConstructor
@@ -37,14 +38,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final ObjectMapper objectMapper;
 
     @Override
+    @CacheEvict(value = {"studentEnrollments", "courseEnrollments", "allEnrollments"}, allEntries = true)
     public EnrollmentResponseDto enrollInCourse(EnrollmentRequestDto enrollmentRequestDto, String studentUsername) {
-
         if (enrollmentRepository.existsByStudentUsernameAndCourseId(studentUsername, enrollmentRequestDto.getCourseId())) {
             throw new RuntimeException("Student is already enrolled in this course");
         }
 
         String actualEmail = fetchUserEmailFallback(studentUsername);
-
         Boolean courseExists = webClientBuilder.build()
                 .get()
                 .uri("http://course-service/api/courses/{id}", enrollmentRequestDto.getCourseId())
@@ -63,146 +63,71 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         enrollment.setStudentUsername(studentUsername);
         enrollment.setEnrollmentDate(LocalDateTime.now());
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
-
         Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
-        log.info("Student {} enrolled in course {}", studentUsername, enrollmentRequestDto.getCourseId());
 
-        try {
-            NotificationEventDto event = NotificationEventDto.builder()
-                    .recipientId(studentUsername)
-                    .recipientEmail(actualEmail)
-                    .notificationType(NotificationType.ENROLLMENT_SUCCESS)
-                    .message("You have successfully enrolled in course ID: " + enrollmentRequestDto.getCourseId())
-                    .build();
+        sendNotification(studentUsername, actualEmail, NotificationType.ENROLLMENT_SUCCESS,
+                "You have successfully enrolled in course ID: " + enrollmentRequestDto.getCourseId());
 
-            String jsonPayload = objectMapper.writeValueAsString(event);
-            stringRedisTemplate.opsForList().leftPush("notificationQueue", jsonPayload);
-        } catch (Exception e) {
-            log.error("Could not send notification to Redis", e);
-        }
         return enrollmentMapper.maptoEnrollmentResponseDto(savedEnrollment);
     }
 
     @Override
+    @Cacheable(value = "studentEnrollments", key = "#studentUsername + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
     public PageResponse<EnrollmentResponseDto> getStudentEnrollments(String studentUsername, Pageable pageable) {
         Page<EnrollmentResponseDto> pagedData = enrollmentRepository.findByStudentUsernameAsDTO(studentUsername, pageable);
-
-        return new PageResponse<>(
-                pagedData.getContent(),
-                pagedData.getNumber(),
-                pagedData.getSize(),
-                pagedData.getTotalPages(),
-                pagedData.getTotalElements(),
-                pagedData.getNumberOfElements(),
-                pagedData.isFirst(),
-                pagedData.isLast(),
-                pagedData.hasNext(),
-                pagedData.hasPrevious()
-        );
+        return mapToPageResponse(pagedData);
     }
 
     @Override
+    @CacheEvict(value = {"studentEnrollments", "courseEnrollments", "allEnrollments"}, allEntries = true)
     public void cancelEnrollment(Long enrollmentId, String studentUsername) {
         Enrollment enrollment = enrollmentRepository.findByIdAndStudentUsername(enrollmentId, studentUsername)
                 .orElseThrow(() -> new RuntimeException("Enrollment record not found or access denied"));
 
-        String actualEmail = fetchUserEmailFallback(studentUsername);
-
         enrollment.setStatus(EnrollmentStatus.CANCELLED);
         enrollmentRepository.save(enrollment);
 
-        try {
-            NotificationEventDto event = NotificationEventDto.builder()
-                    .recipientId(studentUsername)
-                    .recipientEmail(actualEmail)
-                    .notificationType(NotificationType.ENROLLMENT_CANCELLED)
-                    .message("You have successfully cancelled enrollment ID: " + enrollmentId)
-                    .build();
-
-            String jsonPayload = objectMapper.writeValueAsString(event);
-            stringRedisTemplate.opsForList().leftPush("notificationQueue", jsonPayload);
-        } catch (Exception e) {
-            log.error("Could not send notification to Redis", e);
-        }
-        log.info("Enrollment {} cancelled by {}", enrollmentId, studentUsername);
+        String actualEmail = fetchUserEmailFallback(studentUsername);
+        sendNotification(studentUsername, actualEmail, NotificationType.ENROLLMENT_CANCELLED,
+                "You have successfully cancelled enrollment ID: " + enrollmentId);
     }
 
     @Override
+    @Cacheable(value = "courseEnrollments", key = "#courseId + '-' + #pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
     public PageResponse<EnrollmentResponseDto> getCourseEnrollments(Long courseId, Pageable pageable) {
-
-       Page<EnrollmentResponseDto> pagedData = enrollmentRepository.findByCourseIdAsDTO(courseId, pageable);
-
-        return new PageResponse<>(
-                pagedData.getContent(),
-                pagedData.getNumber(),
-                pagedData.getSize(),
-                pagedData.getTotalPages(),
-                pagedData.getTotalElements(),
-                pagedData.getNumberOfElements(),
-                pagedData.isFirst(),
-                pagedData.isLast(),
-                pagedData.hasNext(),
-                pagedData.hasPrevious()
-        );
-
+        Page<EnrollmentResponseDto> pagedData = enrollmentRepository.findByCourseIdAsDTO(courseId, pageable);
+        return mapToPageResponse(pagedData);
     }
 
     @Override
+    @CacheEvict(value = {"studentEnrollments", "courseEnrollments", "allEnrollments"}, allEntries = true)
     public void completeCourseEnrollment(Long enrollmentId, String studentUsername) {
         Enrollment enrollment = enrollmentRepository.findByIdAndStudentUsername(enrollmentId, studentUsername)
                 .orElseThrow(() -> new RuntimeException("Enrollment record not found or access denied"));
 
-
-        String actualEmail = fetchUserEmailFallback(studentUsername);
-
         enrollment.setStatus(EnrollmentStatus.COMPLETED);
         enrollmentRepository.save(enrollment);
 
-        try {
-            NotificationEventDto event = NotificationEventDto.builder()
-                    .recipientId(studentUsername)
-                    .recipientEmail(actualEmail)
-                    .notificationType(NotificationType.COURSE_COMPLETED)
-                    .message("You have successfully completed the enrollment of course ID: " + enrollmentId)
-                    .build();
-
-            String jsonPayload = objectMapper.writeValueAsString(event);
-            stringRedisTemplate.opsForList().leftPush("notificationQueue", jsonPayload);
-        } catch (Exception e) {
-            log.error("Could not send notification to Redis", e);
-        }
-        log.info("Enrollment {} completed by {}", enrollmentId, studentUsername);
-
+        String actualEmail = fetchUserEmailFallback(studentUsername);
+        sendNotification(studentUsername, actualEmail, NotificationType.COURSE_COMPLETED,
+                "You have successfully completed the enrollment of course ID: " + enrollmentId);
     }
 
     @Override
+    @CacheEvict(value = {"studentEnrollments", "courseEnrollments", "allEnrollments"}, allEntries = true)
     public void updateProgress(Long enrollmentId, String studentUsername, Double progressPercentage) {
         Enrollment enrollment = enrollmentRepository.findByIdAndStudentUsername(enrollmentId, studentUsername)
                 .orElseThrow(() -> new RuntimeException("Enrollment record not found or access denied"));
-
-        String actualEmail = fetchUserEmailFallback(studentUsername);
 
         enrollment.setProgressPercentage(progressPercentage);
         if (progressPercentage >= 100.0) {
             enrollment.setStatus(EnrollmentStatus.COMPLETED);
         }
-
         enrollmentRepository.save(enrollment);
-        try {
-            NotificationEventDto event = NotificationEventDto.builder()
-                    .recipientId(studentUsername)
-                    .recipientEmail(actualEmail)
-                    .notificationType(NotificationType.PROGRESS_UPDATED)
-                    .message("You have successfully updated the enrollment of course ID: " + enrollmentId)
-                    .build();
 
-            String jsonPayload = objectMapper.writeValueAsString(event);
-            stringRedisTemplate.opsForList().leftPush("notificationQueue", jsonPayload);
-        } catch (Exception e) {
-            log.error("Could not send notification to Redis", e);
-        }
-        log.info("Enrollment {} progress updated to {}% by {}", enrollmentId, progressPercentage, studentUsername);
-
+        String actualEmail = fetchUserEmailFallback(studentUsername);
+        sendNotification(studentUsername, actualEmail, NotificationType.PROGRESS_UPDATED,
+                "You have successfully updated the enrollment of course ID: " + enrollmentId);
     }
 
     @Override
@@ -211,10 +136,28 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     @Override
+    @Cacheable(value = "allEnrollments", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort")
     public PageResponse<EnrollmentResponseDto> getAllEnrollments(Pageable pageable) {
-
         Page<EnrollmentResponseDto> pagedData = enrollmentRepository.findAllAsDTOs(pageable);
+        return mapToPageResponse(pagedData);
+    }
 
+    private void sendNotification(String username, String email, NotificationType type, String message) {
+        try {
+            NotificationEventDto event = NotificationEventDto.builder()
+                    .recipientId(username)
+                    .recipientEmail(email)
+                    .notificationType(type)
+                    .message(message)
+                    .build();
+            String jsonPayload = objectMapper.writeValueAsString(event);
+            stringRedisTemplate.opsForList().leftPush("notificationQueue", jsonPayload);
+        } catch (Exception e) {
+            log.error("Could not send notification to Redis", e);
+        }
+    }
+
+    private PageResponse<EnrollmentResponseDto> mapToPageResponse(Page<EnrollmentResponseDto> pagedData) {
         return new PageResponse<>(
                 pagedData.getContent(),
                 pagedData.getNumber(),

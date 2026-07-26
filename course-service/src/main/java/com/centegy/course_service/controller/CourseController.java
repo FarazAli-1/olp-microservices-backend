@@ -9,7 +9,11 @@ import com.centegy.course_service.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,8 +25,9 @@ public class CourseController {
 
     private final CourseService courseService;
 
+    @PreAuthorize("hasAuthority('INSTRUCTOR')")
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<CourseResponseDto>> createCourse(@RequestBody CourseRequestDto courseRequestDto) {
+    public ResponseEntity<ApiResponse<CourseResponseDto>> createCourse(@Valid @RequestBody CourseRequestDto courseRequestDto) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         log.info("Attempting to create course by instructor: {}", currentUsername);
         CourseResponseDto courseResponseDto = courseService.createCourse(courseRequestDto, currentUsername);
@@ -36,6 +41,7 @@ public class CourseController {
         );
     }
 
+    @PreAuthorize("hasAuthority('INSTRUCTOR')")
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CourseResponseDto>> updateCourse(@PathVariable Long id, @Valid @RequestBody CourseRequestDto courseRequestDto) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -53,12 +59,17 @@ public class CourseController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<CourseResponseDto>>> getAllCourses(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @PageableDefault(
+                    page = 0,
+                    size = 10,
+                    sort = "id",
+                    direction = Sort.Direction.ASC
+            )
+            Pageable pageable
+    )  {
         log.info("Attempting to get all courses");
-        PageResponse<CourseResponseDto> pageResponse = courseService.getAllCourses(page, size);
-        log.info("Course retrieved successfully: {}", pageResponse.getTotalElements());
+        PageResponse<CourseResponseDto> pageResponse = courseService.getAllCourses(pageable);
+        log.info("Courses retrieved successfully");
         return ResponseEntity.ok(
                 new ApiResponse<>(
                         true,
@@ -83,6 +94,7 @@ public class CourseController {
         );
     }
 
+    @PreAuthorize("hasAuthority('INSTRUCTOR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCourseById(@PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();

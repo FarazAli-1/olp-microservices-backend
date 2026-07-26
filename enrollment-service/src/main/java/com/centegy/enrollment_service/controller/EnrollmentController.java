@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +27,7 @@ public class EnrollmentController {
 
     private final EnrollmentService  enrollmentService;
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @PostMapping("/enroll")
     public ResponseEntity<ApiResponse<EnrollmentResponseDto>> enrollInCourse(@Valid @RequestBody EnrollmentRequestDto enrollmentRequestDto) {
         log.info("Attempting to create enrollment");
@@ -41,6 +43,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<Void>> cancelEnrollment(@PathVariable Long id){
         log.info("Attempting to cancel enrollment");
@@ -56,6 +59,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @PutMapping("/{id}/progress")
     public ResponseEntity<ApiResponse<Void>> updateProgress(
             @PathVariable Long id, @Valid @RequestBody UpdateProgressRequestDto progressDto) {
@@ -70,6 +74,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @PutMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<Void>> completeCourse(@PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -82,6 +87,8 @@ public class EnrollmentController {
                 )
         );
     }
+
+    @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponseDto>>> getAllEnrollments(
             @PageableDefault(
@@ -97,6 +104,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(new ApiResponse<>(true, "All enrollments retrieved", response));
     }
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @GetMapping("/my-enrollments")
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponseDto>>> getMyEnrollments(
             @PageableDefault(
@@ -119,6 +127,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping("/course/{id}")
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponseDto>>>  getEnrollmentByCourse(
             @PathVariable Long id,
@@ -142,6 +151,7 @@ public class EnrollmentController {
         );
     }
 
+    @PreAuthorize("hasAuthority('STUDENT')")
     @GetMapping("/status/{courseId}")
     public ResponseEntity<ApiResponse<Boolean>> checkStatus(@PathVariable Long courseId) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
