@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enrollment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: enrollment-service
+  template:
+    metadata:
+      labels:
+        app: enrollment-service
+    spec:
+      containers:
+        - name: enrollment-service
+          image: farazpr0/olp-enrollment-service:latest
+          ports:
+            - containerPort: 8083
+          env:
+            - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+              value: "true"
+            - name: SPRING_CONFIG_IMPORT
+              value: "optional:configserver:http://config-server:8888"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: "http://service-discovery:8761/eureka/"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/olp_database"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: olp-secrets
+                  key: db-password
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: olp-secrets
+                  key: jwt-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: enrollment-service
+spec:
+  selector:
+    app: enrollment-service
+  ports:
+    - port: 8083
+      targetPort: 8083

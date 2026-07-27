@@ -15,11 +15,12 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CourseRequestDto {
 
-    @NotBlank
+    @NotBlank(message = "Course title cannot be blank")
     private String title;
-    @NotBlank
-    private String description;
-    @Min(0)
-    private BigDecimal price;
 
+    @NotBlank(message = "Course description cannot be blank")
+    private String description;
+
+    @Min(value = 0, message = "Price cannot be a negative value")
+    private BigDecimal price;
 }

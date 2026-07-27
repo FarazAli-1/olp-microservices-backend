@@ -27,7 +27,6 @@ public class CourseServiceImpl implements CourseService{
     private final CourseRepository courseRepository;
     private final CourseMapper courseMapper;
 
-    @Transactional
     @Override
     @CacheEvict(value = "coursesList", allEntries = true)
     public CourseResponseDto createCourse(CourseRequestDto courseRequestDto, String instructorUsername) {

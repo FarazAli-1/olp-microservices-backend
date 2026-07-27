@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# IDEs
+.idea/
+*.iml
+*.class
+.vscode/
+
+# Maven build folders
+target/
+**/target/
+*.jar
+*.war
+
+# K8s Configs & Scripts (Not needed inside the Java container)
+k8s/
+deploy.ps1
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
